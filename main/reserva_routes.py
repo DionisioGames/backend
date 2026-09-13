@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from main.models import Reserva
 
@@ -6,7 +6,7 @@ from main.data import salas, reservas, historico_reservas, usuarios
 
 router = APIRouter(tags=["Reservas"])
 
-@router.post("/reservas")
+@router.post("/reservas", status_code = 201)
 def criar_reserva(reserva: Reserva):
 
     sala_encontrada = False
@@ -17,9 +17,10 @@ def criar_reserva(reserva: Reserva):
             break
 
     if sala_encontrada == False:
-        return {
-            "mensagem": "Sala não encontrada"
-        }
+        raise HTTPException(
+            status_code = 404, #404 Not Found Sala não encontrada
+            detail = "Sala não encontrada. Verifique os dados e tente novamente."
+        )
 
     professor_encontrado = False
 
@@ -29,14 +30,16 @@ def criar_reserva(reserva: Reserva):
             break
 
     if professor_encontrado == False:
-        return {
-            "mensagem": "Professor não encontrado"
-        }
+        raise HTTPException(
+            status_code = 404, #404 Not Found Professor não encontrado
+            detail = "Professor não encontrado. Verifique os dados e tente novamente."
+        )
 
     if reserva.hora_inicio >= reserva.hora_fim:
-        return {
-            "mensagem": "O horário inicial deve ser menor que o horário final"
-        }
+        raise HTTPException(
+            status_code = 400, #400 Bad Request Requisição está errada, hora de início é maior ou igual a hora de fim
+            detail = "Erro ao criar a reserva. Verifique os dados e tente novamente."
+        )
 
     for reserva_existente in reservas:
         if (
@@ -45,14 +48,14 @@ def criar_reserva(reserva: Reserva):
             and reserva.hora_inicio < reserva_existente.hora_fim
             and reserva.hora_fim > reserva_existente.hora_inicio
         ):
-            return {
-                "mensagem": "Já existe uma reserva nesse horário"
-            }
+            raise HTTPException(
+                status_code = 409, #409 Conflict Conflito de requisição, já existe uma reserva nesse horário
+                detail = "Erro ao criar a reserva. Verifique os dados e tente novamente."
+            )
 
     reservas.append(reserva)
-
-    return {
-        "mensagem": "Solicitação de reserva criada com sucesso",
+    return{
+        "mensagem": "Reserva criada com sucesso",
         "reserva": reserva
     }
 
@@ -67,8 +70,10 @@ def buscar_reserva(id: int):
         if reserva.id == id:
             return reserva
 
-    return {"mensagem": "Reserva não encontrada"}
-
+    raise HTTPException(
+        status_code = 404, #404 Not Found Reserva não encontrada
+        detail = "Reserva não encontrada. Verifique os dados e tente novamente."
+    )
 @router.get("/historico/reservas")
 def listar_historico_reservas():
     return historico_reservas
@@ -80,9 +85,10 @@ def aprovar_reserva(id: int):
         if reserva.id == id:
 
             if reserva.status != "pendente":
-                return {
-                    "mensagem": "Essa reserva já foi analisada"
-                }
+                raise HTTPException(
+                    status_code = 409, #409 Conflict Conflito de requisição, reserva já foi analisada
+                    detail = "Essa reserva já foi analisada. Verifique os dados e tente novamente."
+                )
 
             reserva.status = "aprovada"
 
@@ -91,7 +97,10 @@ def aprovar_reserva(id: int):
                 "reserva": reserva
             }
 
-    return {"mensagem": "Reserva não encontrada"}
+    raise HTTPException(
+        status_code = 404, #404 Not Found Reserva não encontrada
+    detail = "Reserva não encontrada. Verifique os dados e tente novamente."
+    )
 
 @router.patch("/reservas/{id}/rejeitar")
 def rejeitar_reserva(id: int):
@@ -100,9 +109,10 @@ def rejeitar_reserva(id: int):
         if reserva.id == id:
 
             if reserva.status != "pendente":
-                return {
-                    "mensagem": "Essa reserva já foi analisada"
-                }
+                raise HTTPException(
+                    status_code = 409, #409 Conflict Conflito de requisição, reserva já foi analisada
+                    detail = "Essa reserva já foi analisada. Verifique os dados e tente novamente."
+                )
 
             reserva.status = "rejeitada"
 
@@ -111,7 +121,10 @@ def rejeitar_reserva(id: int):
                 "reserva": reserva
             }
 
-    return {"mensagem": "Reserva não encontrada"}
+    raise HTTPException(
+        status_code = 404, #404 Not Found Reserva não encontrada
+        detail = "Reserva não encontrada. Verifique os dados e tente novamente."
+    )
 
 @router.delete("/reservas/{id}")
 def cancelar_reserva(id: int):
@@ -129,5 +142,7 @@ def cancelar_reserva(id: int):
                 "reserva": reserva
             }
 
-    return {"mensagem": "Reserva não encontrada"}
-
+    raise HTTPException(
+        status_code = 404, #404 Not Found Reserva não encontrada
+        detail = "Reserva não encontrada. Verifique os dados e tente novamente."
+    )
