@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import date, time
 
 class Sala(BaseModel):
@@ -18,3 +18,22 @@ class Reserva(BaseModel):
     hora_inicio: time
     hora_fim: time
     status: str = "pendente"
+
+class Usuario(BaseModel):
+    id: int
+    nome: str
+    email: EmailStr
+    senha: str
+    telefone: str
+    tipo: str
+
+class UsuarioResponse(BaseModel):
+    id: int
+    nome: str
+    email: EmailStr
+    telefone: str
+    tipo: str
+
+class Login(BaseModel):
+    email: EmailStr
+    senha: str
