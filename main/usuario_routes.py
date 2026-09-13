@@ -4,6 +4,8 @@ from main.models import Usuario, UsuarioResponse
 
 from main.data import usuarios
 
+from main.security import gerar_hash_senha
+
 router = APIRouter(tags = ["Usuários"])
 
 @router.post("/usuarios", status_code = 201)
@@ -21,6 +23,8 @@ def cadastrar_usuario(usuario: Usuario):
                status_code = 409, #409 Conflict Conflito de requisição, já existe um usuário com esse email
                detail = "Erro ao criar o usuário. Verifique os dados e tente novamente."
            )
+    usuario.senha = gerar_hash_senha(usuario.senha)
+        
     usuarios.append(usuario)
 
     return {

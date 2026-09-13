@@ -4,13 +4,18 @@ from main.models import Login
 
 from main.data import usuarios
 
+from main.security import verificar_senha
+
 router = APIRouter(tags = ["Autenticado"])
 
 @router.post("/login")
 def login(dados: Login): 
 
     for usuario in usuarios:
-        if usuario.email == dados.email and usuario.senha == dados.senha:
+        if usuario.email == dados.email and verificar_senha(
+            dados.senha,  # senha digitada pelo usuário
+            usuario.senha # senha armazenada no banco de dados(HASH)  
+            ):
             return {
                 "mensagem": "Login realizado com sucesso",
                 "usuario": {
