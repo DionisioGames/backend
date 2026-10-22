@@ -2,6 +2,7 @@
 # para desabilitar o servidor coloque no terminal e digite o comando  (ctrl + c)
 # para entrar no ambiente virtual: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\.venv\Scripts\Activate.ps1
 # para sair do ambiente virtual: deactivate
+#passo a passo para fazer o commit: 1º passo é -> (git add .), 2º passo é -> (git commit -m "escreve alguma coisa") e 3º passo é -> (git push origin main)
 
 from fastapi import FastAPI
 
