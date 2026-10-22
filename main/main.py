@@ -1,5 +1,7 @@
 # para rodar o codigo, executar no terminal: uvicorn main.main:app --reload
 # para desabilitar o servidor coloque no terminal e digite o comando  (ctrl + c)
+# para entrar no ambiente virtual: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\.venv\Scripts\Activate.ps1
+# para sair do ambiente virtual: deactivate
 
 from fastapi import FastAPI
 

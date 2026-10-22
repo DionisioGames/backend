@@ -1,13 +1,48 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
-from main.models import Reserva
+from main.models import Reserva, ReservaCreate
 
 from main.data import salas, reservas, historico_reservas, usuarios
+
+from main.security import usuario_autenticado
 
 router = APIRouter(tags=["Reservas"])
 
 @router.post("/reservas", status_code = 201)
-def criar_reserva(reserva: Reserva):
+def criar_reserva(
+    dados_reserva: ReservaCreate,
+    dados_token: dict = Depends(usuario_autenticado) # ele vai primereiro exucutar a função usuario_autenticado e vai passar o resultado dela para a variavel dados_token
+
+    ):
+    tipo_usuario = dados_token["tipo"]
+    id_usuario_logado = int(dados_token["sub"])
+   
+    if tipo_usuario not in ["professor", "secretaria"]:
+            raise HTTPException(
+                status_code = 403, #403 Forbidden Usuário não tem permissão para acessar essa rota
+                detail = "Você não tem permissão para criar uma reserva."
+            )
+
+    if tipo_usuario == "professor":
+        id_professor = id_usuario_logado
+
+    else:
+        id_professor = dados_reserva.id_professor
+
+    if tipo_usuario == "secretaria":
+        status_inicial = "aprovada"
+    else:
+        status_inicial = "pendente"
+
+    reserva = Reserva(
+            id = dados_reserva.id,
+            id_sala = dados_reserva.id_sala,
+            id_professor = id_professor,
+            data = dados_reserva.data,
+            hora_inicio = dados_reserva.hora_inicio,
+            hora_fim = dados_reserva.hora_fim,
+            status = status_inicial
+        )
 
     sala_encontrada = False
 
@@ -22,15 +57,17 @@ def criar_reserva(reserva: Reserva):
             detail = "Sala não encontrada. Verifique os dados e tente novamente."
         )
 
-    professor_encontrado = False
+    if reserva.id_professor is not None:
+    
+        professor_encontrado = False
 
-    for usuario in usuarios:
-        if usuario.id == reserva.id_professor and usuario.tipo == "professor":
-            professor_encontrado = True
-            break
+        for usuario in usuarios:
+            if (usuario.id == reserva.id_professor and usuario.tipo == "professor"):
+                professor_encontrado = True
+                break
 
-    if professor_encontrado == False:
-        raise HTTPException(
+        if not professor_encontrado:
+            raise HTTPException(
             status_code = 404, #404 Not Found Professor não encontrado
             detail = "Professor não encontrado. Verifique os dados e tente novamente."
         )
@@ -79,7 +116,16 @@ def listar_historico_reservas():
     return historico_reservas
 
 @router.patch("/reservas/{id}/aprovar")
-def aprovar_reserva(id: int):
+def aprovar_reserva(
+    id: int,
+    dados_token: dict = Depends(usuario_autenticado) # ele vai primereiro exucutar a função usuario_autenticado e vai passar o resultado dela para a variavel dados_token
+
+    ):
+    if dados_token["tipo"] != "secretaria":
+        raise HTTPException(
+            status_code = 403, #403 Forbidden Usuário não tem permissão para acessar essa rota
+            detail = "Apenas a secretaria pode aprovar reservas."
+        )
 
     for reserva in reservas:
         if reserva.id == id:
@@ -103,7 +149,16 @@ def aprovar_reserva(id: int):
     )
 
 @router.patch("/reservas/{id}/rejeitar")
-def rejeitar_reserva(id: int):
+def rejeitar_reserva(
+    id: int,
+    dados_token: dict = Depends(usuario_autenticado)
+
+    ):
+    if dados_token["tipo"] != "secretaria":
+        raise HTTPException(
+            status_code = 403, #403 Forbidden Usuário não tem permissão para acessar essa rota
+            detail = "Apenas a secretaria pode rejeitar reservas."
+        )
 
     for reserva in reservas:
         if reserva.id == id:
@@ -126,23 +181,116 @@ def rejeitar_reserva(id: int):
         detail = "Reserva não encontrada. Verifique os dados e tente novamente."
     )
 
-@router.delete("/reservas/{id}")
-def cancelar_reserva(id: int):
+@router.patch("/reservas/{id}/solicitar-cancelamento")
+def solicitar_cancelamento(
+    id: int,
+    dados_token: dict = Depends(usuario_autenticado)
+):
+    if dados_token["tipo"] != "professor":
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas professores podem solicitar cancelamentos."
+        )
+
+    id_professor_logado = int(dados_token["sub"])
 
     for reserva in reservas:
         if reserva.id == id:
 
+            if reserva.id_professor != id_professor_logado:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Você não pode solicitar o cancelamento de uma reserva de outro professor."
+                )
+
+            if reserva.status != "aprovada":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Somente reservas aprovadas podem ter cancelamento solicitado."
+                )
+
+            if reserva.status_cancelamento == "pendente":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Já existe uma solicitação de cancelamento pendente."
+                )
+
+            reserva.status_cancelamento = "pendente"
+
+            return {
+                "mensagem": "Solicitação de cancelamento enviada à secretaria.",
+                "reserva": reserva
+            }
+
+    raise HTTPException(
+        status_code=404,
+        detail="Reserva não encontrada."
+    )
+
+@router.patch("/reservas/{id}/aprovar-cancelamento")
+def aprovar_cancelamento(
+    id: int,
+    dados_token: dict = Depends(usuario_autenticado)
+):
+    if dados_token["tipo"] != "secretaria":
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas a secretaria pode aprovar cancelamentos."
+        )
+
+    for reserva in reservas:
+        if reserva.id == id:
+
+            if reserva.status_cancelamento != "pendente":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Não existe solicitação de cancelamento pendente."
+                )
+
+            reserva.status_cancelamento = "aprovado"
             reserva.status = "cancelada"
 
             historico_reservas.append(reserva)
             reservas.remove(reserva)
 
             return {
-                "mensagem": "Reserva cancelada com sucesso",
+                "mensagem": "Cancelamento aprovado pela secretaria.",
                 "reserva": reserva
             }
 
     raise HTTPException(
-        status_code = 404, #404 Not Found Reserva não encontrada
-        detail = "Reserva não encontrada. Verifique os dados e tente novamente."
+        status_code=404,
+        detail="Reserva não encontrada."
+    )
+
+@router.patch("/reservas/{id}/rejeitar-cancelamento")
+def rejeitar_cancelamento(
+    id: int,
+    dados_token: dict = Depends(usuario_autenticado)
+):
+    if dados_token["tipo"] != "secretaria":
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas a secretaria pode rejeitar cancelamentos."
+        )
+
+    for reserva in reservas:
+        if reserva.id == id:
+
+            if reserva.status_cancelamento != "pendente":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Não existe solicitação de cancelamento pendente."
+                )
+
+            reserva.status_cancelamento = "rejeitado"
+
+            return {
+                "mensagem": "Solicitação de cancelamento rejeitada.",
+                "reserva": reserva
+            }
+
+    raise HTTPException(
+        status_code=404,
+        detail="Reserva não encontrada."
     )

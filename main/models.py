@@ -13,11 +13,20 @@ class Sala(BaseModel):
 class Reserva(BaseModel):
     id: int
     id_sala: int
-    id_professor: int
+    id_professor: int | None = None
     data: date
     hora_inicio: time
     hora_fim: time
     status: str = "pendente"
+    status_cancelamento: str = "nenhum"
+
+class ReservaCreate(BaseModel):
+    id: int
+    id_sala: int
+    data: date
+    hora_inicio: time
+    hora_fim: time
+    id_professor: int | None = None
 
 class Usuario(BaseModel):
     id: int
